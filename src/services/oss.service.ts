@@ -3,7 +3,6 @@ import { ossConfig, validateConfig } from '../config/oss.config';
 import type {
   OSSObject,
   ListObjectsParams,
-  UploadResult,
   BucketInfo,
   PaginatedResponse,
 } from '../types';
@@ -90,29 +89,6 @@ export class OSSService {
       };
     } catch (error) {
       throw new Error(`列出文件失败: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * 上传文件
-   */
-  async uploadFile(
-    key: string,
-    file: Buffer | string | ReadableStream,
-    progress?: (p: number, checkpoint: any) => void
-  ): Promise<UploadResult> {
-    try {
-      const result = await this.client.put(key, file, {
-        progress,
-      });
-
-      return {
-        name: result.name,
-        url: result.url,
-        size: 0,
-      };
-    } catch (error) {
-      throw new Error(`上传文件失败: ${(error as Error).message}`);
     }
   }
 

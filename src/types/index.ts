@@ -25,13 +25,6 @@ export interface ListObjectsParams {
   delimiter?: string;
 }
 
-// 上传结果
-export interface UploadResult {
-  name: string;
-  url: string;
-  size: number;
-}
-
 // Bucket 信息
 export interface BucketInfo {
   name: string;

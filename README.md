@@ -1,16 +1,16 @@
-# 阿里云 OSS 内容管理查看器
+# 阿里云 OSS 内容查看器
 
-一个基于 Node.js + TypeScript 开发的阿里云 OSS 内容管理 Web 工具。
+一个基于 Node.js + TypeScript 开发的阿里云 OSS 内容查看 Web 工具。
 
 ## 功能特性
 
 - 📁 **文件浏览** - 浏览 OSS Bucket 中的文件和文件夹
-- 📤 **文件上传** - 支持拖拽上传，显示上传进度
+- 👁️ **文件预览** - 支持图片、视频、音频、PDF 在线预览
 - 📥 **文件下载** - 一键下载文件
-- 🗑️ **文件删除** - 支持单个文件删除
-- 👁️ **文件预览** - 支持图片等文件在线预览
-- 🔍 **搜索功能** - 快速搜索文件
+- 🔍 **搜索功能** - 全库快速搜索文件
 - 📂 **目录导航** - 面包屑导航，快速切换目录
+- 📄 **分页显示** - 支持大文件列表的分页浏览
+- 🗂️ **排序功能** - 按名称、大小、修改时间排序
 
 ## 快速开始
 
@@ -75,11 +75,12 @@ oss-manager/
 │   ├── types/           # TypeScript 类型定义
 │   │   └── index.ts
 │   ├── web/             # 前端资源
-│   │   ├── index.html
+│   │   ├── index.html   # 主页面
 │   │   ├── css/
+│   │   │   └── style.css
 │   │   └── js/
+│   │       └── app.js   # 前端逻辑
 │   └── server.ts        # 服务入口
-├── plan/                # 计划文档
 ├── .env.example         # 环境变量示例
 ├── tsconfig.json
 ├── package.json
@@ -93,8 +94,7 @@ oss-manager/
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/objects` | 获取文件列表 |
-| POST | `/api/upload` | 上传文件 |
-| DELETE | `/api/objects/:key` | 删除文件 |
+| GET | `/api/search` | 搜索文件 |
 | GET | `/api/signed-url` | 获取临时访问链接 |
 | GET | `/api/objects/:key/meta` | 获取文件元数据 |
 
@@ -103,9 +103,18 @@ oss-manager/
 **获取文件列表 (`GET /api/objects`)**
 
 - `prefix` - 前缀过滤（目录）
-- `marker` - 分页标记
-- `max-keys` - 每页数量（默认 100）
-- `delimiter` - 分隔符
+- `continuation-token` - 分页标记
+- `max-keys` - 每页数量（默认 50）
+
+**搜索文件 (`GET /api/search`)**
+
+- `q` - 搜索关键词
+- `limit` - 最大返回数量（默认 1000）
+
+**获取签名 URL (`GET /api/signed-url`)**
+
+- `key` - 文件 key
+- `expires` - 过期时间（秒，默认 3600）
 
 ## 技术栈
 
@@ -114,10 +123,7 @@ oss-manager/
 - **Web 框架**: Express.js
 - **OSS SDK**: ali-oss
 - **前端**: 原生 HTML/CSS/JavaScript
-
-## 开发计划
-
-详见 [plan/oss-manager-plan.md](./plan/oss-manager-plan.md)
+- **特性**: XSS 防护、事件委托、分页加载
 
 ## License
 

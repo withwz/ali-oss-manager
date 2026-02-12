@@ -87,30 +87,6 @@ export class OSSController {
   };
 
   /**
-   * 上传文件
-   */
-  uploadFile = async (req: Request, res: Response): Promise<void> => {
-    try {
-      if (!req.file) {
-        const response: ApiResponse = { success: false, error: '没有文件上传' };
-        res.status(400).json(response);
-        return;
-      }
-
-      const key = req.body.key || req.file.originalname;
-      const result = await this.ossService.uploadFile(key, req.file.buffer);
-      const response: ApiResponse = { success: true, data: result };
-      res.json(response);
-    } catch (error) {
-      const response: ApiResponse = {
-        success: false,
-        error: (error as Error).message,
-      };
-      res.status(500).json(response);
-    }
-  };
-
-  /**
    * 搜索文件（全库搜索）
    */
   searchObjects = async (req: Request, res: Response): Promise<void> => {

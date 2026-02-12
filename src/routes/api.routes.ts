@@ -1,18 +1,9 @@
 import type { Router } from 'express';
 import express from 'express';
-import multer from 'multer';
 import { OSSController } from '../controllers/oss.controller';
 
 const router: Router = express.Router();
 const controller = new OSSController();
-
-// 配置内存存储
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: {
-    fileSize: 100 * 1024 * 1024, // 100MB
-  },
-});
 
 /**
  * @route   GET /api/buckets
@@ -43,13 +34,6 @@ router.get('/objects/:key/meta', controller.getObjectMeta);
  * @query   expires - 过期时间（秒）
  */
 router.get('/signed-url', controller.getSignedUrl);
-
-/**
- * @route   POST /api/upload
- * @desc    上传文件
- * @body    key - 可选，指定存储路径
- */
-router.post('/upload', upload.single('file'), controller.uploadFile);
 
 /**
  * @route   GET /api/search

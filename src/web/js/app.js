@@ -29,17 +29,10 @@ const state = {
 const elements = {
   fileListBody: document.getElementById('fileListBody'),
   refreshBtn: document.getElementById('refreshBtn'),
-  uploadBtn: document.getElementById('uploadBtn'),
   searchInput: document.getElementById('searchInput'),
   pageSizeSelect: document.getElementById('pageSizeSelect'),
   sortField: document.getElementById('sortField'),
   sortOrder: document.getElementById('sortOrder'),
-  uploadZone: document.getElementById('uploadZone'),
-  fileInput: document.getElementById('fileInput'),
-  uploadProgress: document.getElementById('uploadProgress'),
-  uploadProgressBar: document.getElementById('uploadProgressBar'),
-  uploadFileName: document.getElementById('uploadFileName'),
-  uploadPercent: document.getElementById('uploadPercent'),
   previewModal: document.getElementById('previewModal'),
   previewContent: document.getElementById('previewContent'),
   fileCount: document.getElementById('fileCount'),
@@ -456,52 +449,6 @@ async function downloadFile(name) {
   }
 }
 
-// 上传文件
-async function uploadFile(file) {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('key', state.currentPrefix + file.name);
-
-  elements.uploadFileName.textContent = file.name;
-  elements.uploadProgress.classList.remove('hidden');
-  elements.uploadProgressBar.style.width = '0%';
-  elements.uploadPercent.textContent = '0%';
-
-  try {
-    const xhr = new XMLHttpRequest();
-
-    xhr.upload.addEventListener('progress', (e) => {
-      if (e.lengthComputable) {
-        const percent = Math.round((e.loaded / e.total) * 100);
-        elements.uploadProgressBar.style.width = percent + '%';
-        elements.uploadPercent.textContent = percent + '%';
-      }
-    });
-
-    xhr.addEventListener('load', () => {
-      if (xhr.status === 200) {
-        const result = JSON.parse(xhr.responseText);
-        if (result.success) {
-          loadFiles(true);
-          elements.uploadProgress.classList.add('hidden');
-        } else {
-          alert('上传失败: ' + result.error);
-        }
-      }
-    });
-
-    xhr.addEventListener('error', () => {
-      alert('上传失败: 网络错误');
-      elements.uploadProgress.classList.add('hidden');
-    });
-
-    xhr.open('POST', `${API_BASE}/upload`);
-    xhr.send(formData);
-  } catch (error) {
-    alert('上传失败: ' + error.message);
-    elements.uploadProgress.classList.add('hidden');
-  }
-}
 
 // 防抖函数
 function debounce(func, wait) {
@@ -518,9 +465,6 @@ function debounce(func, wait) {
 
 // 事件监听
 elements.refreshBtn.addEventListener('click', () => loadFiles(true));
-
-// 上传按钮 - 直接触发文件选择
-elements.uploadBtn.addEventListener('click', () => elements.fileInput.click());
 
 // 搜索防抖
 elements.searchInput.addEventListener('input', debounce((e) => {
@@ -565,34 +509,6 @@ elements.prevPageBtn.addEventListener('click', () => goToPage(state.pagination.c
 elements.nextPageBtn.addEventListener('click', () => goToPage(state.pagination.currentPage + 1));
 elements.lastPageBtn.addEventListener('click', () => goToPage(state.pagination.totalPages));
 
-// 上传区域事件
-elements.uploadZone.addEventListener('click', () => elements.fileInput.click());
-
-elements.uploadZone.addEventListener('dragover', (e) => {
-  e.preventDefault();
-  elements.uploadZone.classList.add('dragover');
-});
-
-elements.uploadZone.addEventListener('dragleave', () => {
-  elements.uploadZone.classList.remove('dragover');
-});
-
-elements.uploadZone.addEventListener('drop', (e) => {
-  e.preventDefault();
-  elements.uploadZone.classList.remove('dragover');
-
-  const files = e.dataTransfer.files;
-  if (files.length > 0) {
-    uploadFile(files[0]);
-  }
-});
-
-elements.fileInput.addEventListener('change', (e) => {
-  if (e.target.files.length > 0) {
-    uploadFile(e.target.files[0]);
-  }
-});
-
 // 模态框事件
 document.querySelector('.modal-close').addEventListener('click', () => {
   elements.previewModal.classList.add('hidden');
@@ -635,17 +551,6 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-// 导航切换
-document.querySelectorAll('.nav-item').forEach((item) => {
-  item.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach((i) => i.classList.remove('active'));
-    item.classList.add('active');
-
-    const view = item.dataset.view;
-    document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
-    document.getElementById(view + 'View').classList.add('active');
-  });
-});
 
 // 初始化
 loadFiles(true);
