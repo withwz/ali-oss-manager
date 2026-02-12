@@ -610,30 +610,33 @@ async function loadGallery(reset = true) {
       elements.galleryMasonry.innerHTML = '<div class="gallery-loading"><div class="spinner"></div><p>加载图片中...</p></div>';
     }
 
-    const params = new URLSearchParams({
-      'max-keys': '100',
-    });
-
-    // 如果有更多图片，使用 continuation token
-    if (!reset && state.gallery.continuationToken) {
-      params.append('continuation-token', state.gallery.continuationToken);
-    }
-
-    const response = await fetch(`${API_BASE}/objects?${params}`);
+    // 使用搜索 API 获取所有图片文件
+    const response = await fetch(`${API_BASE}/search?q=&limit=500`);
     const result = await response.json();
+
+    console.log('Gallery API result:', result);
 
     if (result.success) {
       const items = result.data.items || [];
-      const images = items.filter(item => item.type === 'file' && isImageFile(item.name));
+      console.log('Items before filter:', items);
 
-      state.gallery.images = reset ? images : [...state.gallery.images, ...images];
-      state.gallery.continuationToken = result.data.isTruncated ? result.data.nextMarker : null;
-      state.gallery.hasMore = result.data.isTruncated;
-      state.gallery.loadedCount = state.gallery.images.length;
+      const images = items.filter(item => {
+        const isFile = item.type === 'file';
+        const isImg = isImageFile(item.name);
+        console.log(`${item.name}: type=${item.type}, isFile=${isFile}, isImage=${isImg}`);
+        return isFile && isImg;
+      });
+
+      console.log('Filtered images:', images);
+
+      state.gallery.images = images;
+      state.gallery.hasMore = false;
+      state.gallery.loadedCount = images.length;
 
       await renderGallery();
     }
   } catch (error) {
+    console.error('Gallery load error:', error);
     elements.galleryMasonry.innerHTML = `<div class="gallery-empty"><div class="gallery-empty-icon">⚠️</div><p>加载失败: ${error.message}</p></div>`;
   } finally {
     state.gallery.isLoading = false;
