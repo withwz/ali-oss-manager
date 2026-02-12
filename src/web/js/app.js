@@ -517,6 +517,9 @@ function debounce(func, wait) {
 // 事件监听
 elements.refreshBtn.addEventListener('click', () => loadFiles(true));
 
+// 上传按钮 - 直接触发文件选择
+elements.uploadBtn.addEventListener('click', () => elements.fileInput.click());
+
 // 搜索防抖
 elements.searchInput.addEventListener('input', debounce((e) => {
   const keyword = e.target.value;
