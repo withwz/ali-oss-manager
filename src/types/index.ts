@@ -20,6 +20,7 @@ export interface OSSObject {
 export interface ListObjectsParams {
   prefix?: string;
   marker?: string;
+  'continuation-token'?: string;
   'max-keys'?: number;
   delimiter?: string;
 }
@@ -53,4 +54,21 @@ export interface PaginatedResponse<T> {
   nextMarker?: string;
   prefix?: string;
   commonPrefixes?: string[];
+  keyCount?: number;
+}
+
+// 分页请求参数
+export interface PaginationParams {
+  page?: number;
+  pageSize?: number;
+  continuationToken?: string;
+}
+
+// 排序类型
+export type SortField = 'name' | 'size' | 'lastModified';
+export type SortOrder = 'asc' | 'desc';
+
+export interface SortParams {
+  field: SortField;
+  order: SortOrder;
 }

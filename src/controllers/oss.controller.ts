@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import { OSSService } from '../services/oss.service';
-import type { ApiResponse, ListObjectsParams } from '../types';
+import type { ApiResponse, ListObjectsParams, PaginationParams } from '../types';
 
 export class OSSController {
   private ossService: OSSService;
@@ -27,14 +27,14 @@ export class OSSController {
   };
 
   /**
-   * 获取文件列表
+   * 获取文件列表（支持分页）
    */
   getObjects = async (req: Request, res: Response): Promise<void> => {
     try {
       const params: ListObjectsParams = {
         prefix: req.query.prefix as string,
-        marker: req.query.marker as string,
-        'max-keys': req.query['max-keys'] ? parseInt(req.query['max-keys'] as string, 10) : 100,
+        'continuation-token': req.query['continuation-token'] as string,
+        'max-keys': req.query['max-keys'] ? parseInt(req.query['max-keys'] as string, 10) : 50,
         delimiter: req.query.delimiter as string,
       };
       const result = await this.ossService.listObjects(params);
@@ -152,17 +152,13 @@ export class OSSController {
   };
 
   /**
-   * 搜索文件
+   * 搜索文件（全库搜索）
    */
   searchObjects = async (req: Request, res: Response): Promise<void> => {
     try {
-      const keyword = req.query.q as string;
-      if (!keyword) {
-        const response: ApiResponse = { success: false, error: '缺少搜索关键词' };
-        res.status(400).json(response);
-        return;
-      }
-      const results = await this.ossService.searchObjects(keyword);
+      const keyword = req.query.q as string || '';
+      const maxKeys = req.query.limit ? parseInt(req.query.limit as string, 10) : 1000;
+      const results = await this.ossService.searchAllObjects(keyword, maxKeys);
       const response: ApiResponse = { success: true, data: { items: results } };
       res.json(response);
     } catch (error) {

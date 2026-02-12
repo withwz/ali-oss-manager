@@ -5,8 +5,24 @@ const API_BASE = '/api';
 const state = {
   currentPrefix: '',
   files: [],
+  allFiles: [], // 搜索结果
   isLoading: false,
   isSearching: false,
+
+  // 分页状态
+  pagination: {
+    currentPage: 1,
+    totalPages: 1,
+    pageSize: 50,
+    continuationTokens: {}, // 存储每页的 continuation token
+    hasMore: false,
+  },
+
+  // 排序状态
+  sort: {
+    field: 'name',
+    order: 'asc', // 'asc' or 'desc'
+  },
 };
 
 // DOM 元素
@@ -15,15 +31,24 @@ const elements = {
   refreshBtn: document.getElementById('refreshBtn'),
   uploadBtn: document.getElementById('uploadBtn'),
   searchInput: document.getElementById('searchInput'),
-  searchBtn: document.getElementById('searchBtn'),
-  clearSearchBtn: document.getElementById('clearSearchBtn'),
+  pageSizeSelect: document.getElementById('pageSizeSelect'),
+  sortField: document.getElementById('sortField'),
+  sortOrder: document.getElementById('sortOrder'),
   uploadZone: document.getElementById('uploadZone'),
   fileInput: document.getElementById('fileInput'),
   uploadProgress: document.getElementById('uploadProgress'),
   uploadProgressBar: document.getElementById('uploadProgressBar'),
   uploadFileName: document.getElementById('uploadFileName'),
+  uploadPercent: document.getElementById('uploadPercent'),
   previewModal: document.getElementById('previewModal'),
   previewContent: document.getElementById('previewContent'),
+  fileCount: document.getElementById('fileCount'),
+  currentPage: document.getElementById('currentPage'),
+  totalPages: document.getElementById('totalPages'),
+  firstPageBtn: document.getElementById('firstPageBtn'),
+  prevPageBtn: document.getElementById('prevPageBtn'),
+  nextPageBtn: document.getElementById('nextPageBtn'),
+  lastPageBtn: document.getElementById('lastPageBtn'),
 };
 
 // 格式化文件大小
@@ -68,13 +93,9 @@ function getFileIcon(name, isFolder) {
 function getFileType(name) {
   const ext = name.split('.').pop().toLowerCase();
   const types = {
-    // 图片
     image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp'],
-    // 视频
     video: ['mp4', 'webm', 'ogg'],
-    // 音频
     audio: ['mp3', 'wav', 'flac'],
-    // PDF
     pdf: ['pdf'],
   };
   for (const [type, exts] of Object.entries(types)) {
@@ -83,22 +104,90 @@ function getFileType(name) {
   return 'other';
 }
 
-// 加载文件列表
-async function loadFiles() {
+// 排序文件
+function sortFiles(files) {
+  const { field, order } = state.sort;
+  const sorted = [...files].sort((a, b) => {
+    // 文件夹排在前面
+    if (a.type !== b.type) {
+      return a.type === 'folder' ? -1 : 1;
+    }
+
+    let comparison = 0;
+    switch (field) {
+      case 'name':
+        comparison = a.name.localeCompare(b.name);
+        break;
+      case 'size':
+        comparison = a.size - b.size;
+        break;
+      case 'lastModified':
+        comparison = new Date(a.lastModified).getTime() - new Date(b.lastModified).getTime();
+        break;
+    }
+    return order === 'asc' ? comparison : -comparison;
+  });
+  return sorted;
+}
+
+// 加载文件列表（带分页）
+async function loadFiles(resetPage = true) {
   if (state.isLoading) return;
+
+  // 如果在搜索模式，使用搜索结果
+  if (state.isSearching) {
+    renderPaginatedFiles(state.allFiles);
+    updatePaginationUI();
+    return;
+  }
+
   state.isLoading = true;
-  state.isSearching = false;
 
   try {
+    // 重置到第一页
+    if (resetPage) {
+      state.pagination.currentPage = 1;
+      state.pagination.continuationTokens = {};
+    }
+
     elements.fileListBody.innerHTML = '<div class="loading">加载中...</div>';
 
-    const params = new URLSearchParams({ prefix: state.currentPrefix });
+    // 获取当前页的 continuation token
+    const continuationToken = state.pagination.continuationTokens[state.pagination.currentPage];
+
+    const params = new URLSearchParams({
+      prefix: state.currentPrefix,
+      'max-keys': state.pagination.pageSize.toString(),
+    });
+
+    if (continuationToken) {
+      params.append('continuation-token', continuationToken);
+    }
+
     const response = await fetch(`${API_BASE}/objects?${params}`);
     const result = await response.json();
 
     if (result.success) {
-      state.files = result.data.items;
-      renderFiles();
+      state.files = result.data.items || [];
+      state.pagination.hasMore = result.data.isTruncated;
+      state.pagination.keyCount = result.data.keyCount || state.files.length;
+
+      // 保存下一页的 token
+      if (result.data.isTruncated && result.data.nextMarker) {
+        state.pagination.continuationTokens[state.pagination.currentPage + 1] = result.data.nextMarker;
+      }
+
+      // 计算总页数（估算）
+      if (!result.data.isTruncated) {
+        state.pagination.totalPages = state.pagination.currentPage;
+      } else {
+        // 估算总页数
+        const estimatedTotal = state.pagination.currentPage * state.pagination.pageSize;
+        state.pagination.totalPages = Math.ceil(estimatedTotal / state.pagination.pageSize);
+      }
+
+      renderPaginatedFiles(state.files);
+      updatePaginationUI();
     } else {
       elements.fileListBody.innerHTML = `<div class="empty">加载失败: ${result.error}</div>`;
     }
@@ -109,13 +198,16 @@ async function loadFiles() {
   }
 }
 
-// 搜索文件
+// 搜索文件（全库搜索）
 async function searchFiles(keyword) {
-  if (state.isLoading) return;
   if (!keyword.trim()) {
-    loadFiles();
+    state.isSearching = false;
+    state.allFiles = [];
+    loadFiles(true);
     return;
   }
+
+  if (state.isLoading) return;
 
   state.isLoading = true;
   state.isSearching = true;
@@ -123,13 +215,19 @@ async function searchFiles(keyword) {
   try {
     elements.fileListBody.innerHTML = '<div class="loading">搜索中...</div>';
 
-    const params = new URLSearchParams({ q: keyword });
+    const params = new URLSearchParams({
+      q: keyword,
+      limit: '1000',
+    });
+
     const response = await fetch(`${API_BASE}/search?${params}`);
     const result = await response.json();
 
     if (result.success) {
-      state.files = result.data.items;
-      renderFiles(result.data.items, true);
+      state.allFiles = result.data.items || [];
+      state.pagination.currentPage = 1;
+      renderPaginatedFiles(state.allFiles);
+      updatePaginationUI();
     } else {
       elements.fileListBody.innerHTML = `<div class="empty">搜索失败: ${result.error}</div>`;
     }
@@ -140,15 +238,38 @@ async function searchFiles(keyword) {
   }
 }
 
+// 渲染分页文件
+function renderPaginatedFiles(files) {
+  // 先排序
+  const sortedFiles = sortFiles(files);
+
+  // 如果是搜索模式，前端分页
+  if (state.isSearching) {
+    const startIndex = (state.pagination.currentPage - 1) * state.pagination.pageSize;
+    const endIndex = startIndex + state.pagination.pageSize;
+    const pageFiles = sortedFiles.slice(startIndex, endIndex);
+
+    state.pagination.totalPages = Math.ceil(sortedFiles.length / state.pagination.pageSize) || 1;
+
+    renderFileList(pageFiles, true);
+  } else {
+    renderFileList(sortedFiles, false);
+  }
+
+  // 更新文件计数
+  const fileCount = sortedFiles.filter(f => f.type === 'file').length;
+  const folderCount = sortedFiles.filter(f => f.type === 'folder').length;
+  elements.fileCount.textContent = `${fileCount} 个文件, ${folderCount} 个文件夹`;
+}
+
 // 渲染文件列表
-function renderFiles(files = state.files, isSearchResult = false) {
+function renderFileList(files, isSearchResult) {
   if (files.length === 0) {
     const emptyText = isSearchResult ? '未找到匹配的文件' : '暂无文件';
     elements.fileListBody.innerHTML = `<div class="empty">${emptyText}</div>`;
     return;
   }
 
-  // 搜索结果时显示路径，普通列表只显示文件名
   elements.fileListBody.innerHTML = files.map((file) => {
     const displayName = isSearchResult ? file.name : file.name.replace(state.currentPrefix, '');
     const displayPath = isSearchResult ? `<div class="file-path">${file.name}</div>` : '';
@@ -177,11 +298,28 @@ function renderFiles(files = state.files, isSearchResult = false) {
   }).join('');
 }
 
+// 更新分页 UI
+function updatePaginationUI() {
+  const { currentPage, totalPages, hasMore } = state.pagination;
+
+  elements.currentPage.textContent = currentPage;
+  elements.totalPages.textContent = state.isSearching ? totalPages : (hasMore ? `${totalPages}+` : totalPages);
+
+  // 更新按钮状态
+  elements.firstPageBtn.disabled = currentPage <= 1;
+  elements.prevPageBtn.disabled = currentPage <= 1;
+  elements.nextPageBtn.disabled = state.isSearching ? currentPage >= totalPages : !hasMore;
+  elements.lastPageBtn.disabled = state.isSearching ? currentPage >= totalPages : false;
+}
+
 // 打开文件夹
 function openFolder(name) {
   state.currentPrefix = name;
+  state.isSearching = false;
+  state.pagination.continuationTokens = {};
+  elements.searchInput.value = '';
   updateBreadcrumb();
-  loadFiles();
+  loadFiles(true);
 }
 
 // 更新面包屑
@@ -201,9 +339,26 @@ function updateBreadcrumb() {
 function navigateToFolder(prefix) {
   state.currentPrefix = prefix;
   state.isSearching = false;
+  state.pagination.continuationTokens = {};
   elements.searchInput.value = '';
   updateBreadcrumb();
-  loadFiles();
+  loadFiles(true);
+}
+
+// 翻页操作
+function goToPage(page) {
+  if (page < 1 || page === state.pagination.currentPage) return;
+
+  // 搜索模式：前端分页
+  if (state.isSearching) {
+    state.pagination.currentPage = page;
+    renderPaginatedFiles(state.allFiles);
+    updatePaginationUI();
+  } else {
+    // 普通模式：需要从服务器加载
+    state.pagination.currentPage = page;
+    loadFiles(false);
+  }
 }
 
 // 预览文件
@@ -219,7 +374,7 @@ async function previewFile(name) {
 
       switch (fileType) {
         case 'image':
-          content = `<img src="${url}" alt="${name}" style="max-width:100%;max-height:80vh;">`;
+          content = `<img src="${url}" alt="${name}">`;
           break;
         case 'video':
           content = `<video controls autoplay style="max-width:100%;max-height:80vh;">
@@ -237,7 +392,6 @@ async function previewFile(name) {
           content = `<iframe src="${url}" style="width:100%;height:80vh;border:none;"></iframe>`;
           break;
         default:
-          // 其他文件类型，提供下载链接
           content = `
             <div class="preview-fallback">
               <div class="fallback-icon">📄</div>
@@ -286,10 +440,11 @@ async function deleteFile(name) {
 
     if (result.success) {
       if (state.isSearching) {
-        // 如果在搜索结果中删除，重新搜索
-        searchFiles(elements.searchInput.value);
+        // 搜索模式：从本地数组移除并重新渲染
+        state.allFiles = state.allFiles.filter(f => f.name !== name);
+        renderPaginatedFiles(state.allFiles);
       } else {
-        loadFiles();
+        loadFiles(false);
       }
     } else {
       alert('删除失败: ' + result.error);
@@ -308,7 +463,7 @@ async function uploadFile(file) {
   elements.uploadFileName.textContent = file.name;
   elements.uploadProgress.classList.remove('hidden');
   elements.uploadProgressBar.style.width = '0%';
-  document.getElementById('uploadPercent').textContent = '0%';
+  elements.uploadPercent.textContent = '0%';
 
   try {
     const xhr = new XMLHttpRequest();
@@ -317,7 +472,7 @@ async function uploadFile(file) {
       if (e.lengthComputable) {
         const percent = Math.round((e.loaded / e.total) * 100);
         elements.uploadProgressBar.style.width = percent + '%';
-        document.getElementById('uploadPercent').textContent = percent + '%';
+        elements.uploadPercent.textContent = percent + '%';
       }
     });
 
@@ -325,7 +480,7 @@ async function uploadFile(file) {
       if (xhr.status === 200) {
         const result = JSON.parse(xhr.responseText);
         if (result.success) {
-          loadFiles();
+          loadFiles(true);
           elements.uploadProgress.classList.add('hidden');
         } else {
           alert('上传失败: ' + result.error);
@@ -360,17 +515,52 @@ function debounce(func, wait) {
 }
 
 // 事件监听
-elements.refreshBtn.addEventListener('click', loadFiles);
+elements.refreshBtn.addEventListener('click', () => loadFiles(true));
 
+// 搜索防抖
 elements.searchInput.addEventListener('input', debounce((e) => {
   const keyword = e.target.value;
-  if (keyword.trim()) {
-    searchFiles(keyword);
-  } else {
-    loadFiles();
-  }
+  searchFiles(keyword);
 }, 500));
 
+// 每页数量选择
+elements.pageSizeSelect.addEventListener('change', (e) => {
+  state.pagination.pageSize = parseInt(e.target.value, 10);
+  state.pagination.continuationTokens = {};
+  loadFiles(true);
+});
+
+// 排序字段选择
+elements.sortField.addEventListener('change', (e) => {
+  state.sort.field = e.target.value;
+  if (state.isSearching) {
+    renderPaginatedFiles(state.allFiles);
+  } else {
+    renderPaginatedFiles(state.files);
+  }
+});
+
+// 排序方向切换
+elements.sortOrder.addEventListener('click', () => {
+  const currentOrder = state.sort.order;
+  const newOrder = currentOrder === 'asc' ? 'desc' : 'asc';
+  state.sort.order = newOrder;
+  elements.sortOrder.setAttribute('data-order', newOrder);
+
+  if (state.isSearching) {
+    renderPaginatedFiles(state.allFiles);
+  } else {
+    renderPaginatedFiles(state.files);
+  }
+});
+
+// 分页按钮
+elements.firstPageBtn.addEventListener('click', () => goToPage(1));
+elements.prevPageBtn.addEventListener('click', () => goToPage(state.pagination.currentPage - 1));
+elements.nextPageBtn.addEventListener('click', () => goToPage(state.pagination.currentPage + 1));
+elements.lastPageBtn.addEventListener('click', () => goToPage(state.pagination.totalPages));
+
+// 上传区域事件
 elements.uploadZone.addEventListener('click', () => elements.fileInput.click());
 
 elements.uploadZone.addEventListener('dragover', (e) => {
@@ -398,6 +588,7 @@ elements.fileInput.addEventListener('change', (e) => {
   }
 });
 
+// 模态框事件
 document.querySelector('.modal-close').addEventListener('click', () => {
   elements.previewModal.classList.add('hidden');
 });
@@ -408,7 +599,7 @@ elements.previewModal.addEventListener('click', (e) => {
   }
 });
 
-// 键盘事件：ESC 关闭预览
+// ESC 键关闭预览
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !elements.previewModal.classList.contains('hidden')) {
     elements.previewModal.classList.add('hidden');
@@ -428,4 +619,4 @@ document.querySelectorAll('.nav-item').forEach((item) => {
 });
 
 // 初始化
-loadFiles();
+loadFiles(true);

@@ -29,15 +29,41 @@
     <main class="main-content">
       <!-- 顶部工具栏 -->
       <header class="toolbar">
-        <div class="breadcrumb">
-          <span class="breadcrumb-item">root</span>
+        <div class="toolbar-left">
+          <div class="breadcrumb">
+            <span class="breadcrumb-item" onclick="navigateToFolder('')">root</span>
+          </div>
         </div>
         <div class="toolbar-actions">
-          <input type="text" id="searchInput" placeholder="搜索文件..." class="search-input">
+          <select id="pageSizeSelect" class="page-size-select">
+            <option value="20">20 条/页</option>
+            <option value="50" selected>50 条/页</option>
+            <option value="100">100 条/页</option>
+            <option value="200">200 条/页</option>
+          </select>
+          <input type="text" id="searchInput" placeholder="全库搜索..." class="search-input">
           <button id="refreshBtn" class="btn btn-secondary">刷新</button>
           <button id="uploadBtn" class="btn btn-primary">上传文件</button>
         </div>
       </header>
+
+      <!-- 排序和统计栏 -->
+      <div class="sort-bar">
+        <div class="sort-info">
+          <span id="fileCount">0 个文件</span>
+        </div>
+        <div class="sort-controls">
+          <span class="sort-label">排序:</span>
+          <select id="sortField" class="sort-select">
+            <option value="name">名称</option>
+            <option value="size">大小</option>
+            <option value="lastModified">修改时间</option>
+          </select>
+          <button id="sortOrder" class="sort-btn" data-order="asc">
+            <span class="sort-icon">↑</span>
+          </button>
+        </div>
+      </div>
 
       <!-- 文件列表视图 -->
       <div id="filesView" class="view active">
@@ -51,6 +77,19 @@
           <div id="fileListBody" class="file-list-body">
             <!-- 文件列表将通过 JS 动态生成 -->
           </div>
+        </div>
+
+        <!-- 分页控件 -->
+        <div class="pagination">
+          <button id="firstPageBtn" class="page-btn" title="首页">««</button>
+          <button id="prevPageBtn" class="page-btn" title="上一页">«</button>
+          <div class="page-info">
+            第 <span id="currentPage">1</span> 页
+            <span class="page-separator">/</span>
+            共 <span id="totalPages">1</span> 页
+          </div>
+          <button id="nextPageBtn" class="page-btn" title="下一页">»</button>
+          <button id="lastPageBtn" class="page-btn" title="末页">»»</button>
         </div>
       </div>
 
