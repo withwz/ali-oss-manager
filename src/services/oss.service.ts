@@ -117,28 +117,6 @@ export class OSSService {
   }
 
   /**
-   * 删除文件
-   */
-  async deleteObject(key: string): Promise<void> {
-    try {
-      await this.client.delete(key);
-    } catch (error) {
-      throw new Error(`删除文件失败: ${(error as Error).message}`);
-    }
-  }
-
-  /**
-   * 批量删除文件
-   */
-  async deleteObjects(keys: string[]): Promise<void> {
-    try {
-      await this.client.deleteMulti(keys);
-    } catch (error) {
-      throw new Error(`批量删除失败: ${(error as Error).message}`);
-    }
-  }
-
-  /**
    * 获取文件签名 URL（临时访问链接）
    */
   getSignedUrl(key: string, expires = 3600): string {

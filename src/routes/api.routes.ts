@@ -52,19 +52,6 @@ router.get('/signed-url', controller.getSignedUrl);
 router.post('/upload', upload.single('file'), controller.uploadFile);
 
 /**
- * @route   DELETE /api/objects/:key
- * @desc    删除单个文件
- */
-router.delete('/objects/:key', controller.deleteObject);
-
-/**
- * @route   DELETE /api/objects/batch
- * @desc    批量删除文件
- * @body    keys - 文件 key 数组
- */
-router.delete('/objects/batch', controller.deleteObjects);
-
-/**
  * @route   GET /api/search
  * @desc    搜索文件
  * @query   q - 搜索关键词

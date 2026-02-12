@@ -54,7 +54,7 @@ export class OSSController {
    */
   getSignedUrl = async (req: Request, res: Response): Promise<void> => {
     try {
-      const { key } = req.params;
+      const key = req.query.key as string;
       const expires = req.query.expires ? parseInt(req.query.expires as string, 10) : 3600;
       const url = this.ossService.getSignedUrl(key, expires);
       const response: ApiResponse = { success: true, data: { url } };
@@ -100,47 +100,6 @@ export class OSSController {
       const key = req.body.key || req.file.originalname;
       const result = await this.ossService.uploadFile(key, req.file.buffer);
       const response: ApiResponse = { success: true, data: result };
-      res.json(response);
-    } catch (error) {
-      const response: ApiResponse = {
-        success: false,
-        error: (error as Error).message,
-      };
-      res.status(500).json(response);
-    }
-  };
-
-  /**
-   * 删除文件
-   */
-  deleteObject = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { key } = req.params;
-      await this.ossService.deleteObject(key);
-      const response: ApiResponse = { success: true, message: '删除成功' };
-      res.json(response);
-    } catch (error) {
-      const response: ApiResponse = {
-        success: false,
-        error: (error as Error).message,
-      };
-      res.status(500).json(response);
-    }
-  };
-
-  /**
-   * 批量删除文件
-   */
-  deleteObjects = async (req: Request, res: Response): Promise<void> => {
-    try {
-      const { keys } = req.body;
-      if (!Array.isArray(keys) || keys.length === 0) {
-        const response: ApiResponse = { success: false, error: '无效的 keys 参数' };
-        res.status(400).json(response);
-        return;
-      }
-      await this.ossService.deleteObjects(keys);
-      const response: ApiResponse = { success: true, message: '删除成功' };
       res.json(response);
     } catch (error) {
       const response: ApiResponse = {

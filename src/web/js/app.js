@@ -262,6 +262,13 @@ function renderPaginatedFiles(files) {
   elements.fileCount.textContent = `${fileCount} 个文件, ${folderCount} 个文件夹`;
 }
 
+// HTML 转义函数
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
 // 渲染文件列表
 function renderFileList(files, isSearchResult) {
   if (files.length === 0) {
@@ -272,14 +279,15 @@ function renderFileList(files, isSearchResult) {
 
   elements.fileListBody.innerHTML = files.map((file) => {
     const displayName = isSearchResult ? file.name : file.name.replace(state.currentPrefix, '');
-    const displayPath = isSearchResult ? `<div class="file-path">${file.name}</div>` : '';
+    const displayPath = isSearchResult ? `<div class="file-path">${escapeHtml(file.name)}</div>` : '';
+    const escapedName = escapeHtml(file.name);
 
     return `
-    <div class="file-item" data-type="${file.type}" data-name="${file.name}">
+    <div class="file-item" data-type="${file.type}" data-name="${escapedName}">
       <div class="file-name">
         <span class="file-icon">${getFileIcon(file.name, file.type === 'folder')}</span>
         <div class="file-name-wrapper">
-          <span class="file-name-text">${displayName}</span>
+          <span class="file-name-text">${escapeHtml(displayName)}</span>
           ${displayPath}
         </div>
       </div>
@@ -287,11 +295,10 @@ function renderFileList(files, isSearchResult) {
       <div>${formatDate(file.lastModified)}</div>
       <div class="file-actions">
         ${file.type === 'folder'
-          ? `<button class="icon-btn" onclick="openFolder('${file.name}')">打开</button>`
-          : `<button class="icon-btn" onclick="previewFile('${file.name}')">预览</button>
-             <button class="icon-btn" onclick="downloadFile('${file.name}')">下载</button>`
+          ? `<button class="icon-btn" data-action="openFolder">打开</button>`
+          : `<button class="icon-btn" data-action="previewFile">预览</button>
+             <button class="icon-btn" data-action="downloadFile">下载</button>`
         }
-        <button class="icon-btn btn-delete" onclick="deleteFile('${file.name}')">删除</button>
       </div>
     </div>
   `;
@@ -326,13 +333,25 @@ function openFolder(name) {
 function updateBreadcrumb() {
   const breadcrumb = document.querySelector('.breadcrumb');
   const parts = state.currentPrefix.split('/').filter(Boolean);
-  breadcrumb.innerHTML = `
-    <span class="breadcrumb-item" onclick="navigateToFolder('')">root</span>
-    ${parts.map((part, i) => {
-      const prefix = parts.slice(0, i + 1).join('/') + '/';
-      return `<span class="breadcrumb-item" onclick="navigateToFolder('${prefix}')">${part}</span>`;
-    }).join('')}
-  `;
+
+  // 创建 root 面包屑项
+  const rootItem = document.createElement('span');
+  rootItem.className = 'breadcrumb-item';
+  rootItem.textContent = 'root';
+  rootItem.addEventListener('click', () => navigateToFolder(''));
+
+  breadcrumb.innerHTML = '';
+  breadcrumb.appendChild(rootItem);
+
+  // 添加子路径面包屑项
+  parts.forEach((part, i) => {
+    const prefix = parts.slice(0, i + 1).join('/') + '/';
+    const item = document.createElement('span');
+    item.className = 'breadcrumb-item';
+    item.textContent = part;
+    item.addEventListener('click', () => navigateToFolder(prefix));
+    breadcrumb.appendChild(item);
+  });
 }
 
 // 导航到文件夹
@@ -367,6 +386,7 @@ async function previewFile(name) {
     const fileType = getFileType(name);
     const response = await fetch(`${API_BASE}/signed-url?key=${encodeURIComponent(name)}&expires=3600`);
     const result = await response.json();
+    console.log('result: ', result);
 
     if (result.success) {
       const url = result.data.url;
@@ -374,7 +394,7 @@ async function previewFile(name) {
 
       switch (fileType) {
         case 'image':
-          content = `<img src="${url}" alt="${name}">`;
+          content = `<img src="${url}" alt="${escapeHtml(name)}">`;
           break;
         case 'video':
           content = `<video controls autoplay style="max-width:100%;max-height:80vh;">
@@ -396,14 +416,20 @@ async function previewFile(name) {
             <div class="preview-fallback">
               <div class="fallback-icon">📄</div>
               <p>此文件类型不支持在线预览</p>
-              <p class="file-name">${name}</p>
-              <button class="btn btn-primary" onclick="downloadFile('${name}')">下载文件</button>
+              <p class="file-name">${escapeHtml(name)}</p>
+              <button class="btn btn-primary preview-download-btn" data-file-name="${escapeHtml(name)}">下载文件</button>
             </div>
           `;
       }
 
       elements.previewContent.innerHTML = content;
       elements.previewModal.classList.remove('hidden');
+
+      // 绑定下载按钮事件
+      const downloadBtn = elements.previewContent.querySelector('.preview-download-btn');
+      if (downloadBtn) {
+        downloadBtn.addEventListener('click', () => downloadFile(name));
+      }
     }
   } catch (error) {
     alert('预览失败: ' + error.message);
@@ -427,30 +453,6 @@ async function downloadFile(name) {
     }
   } catch (error) {
     alert('下载失败: ' + error.message);
-  }
-}
-
-// 删除文件
-async function deleteFile(name) {
-  if (!confirm(`确定要删除 "${name}" 吗?`)) return;
-
-  try {
-    const response = await fetch(`${API_BASE}/objects/${encodeURIComponent(name)}`, { method: 'DELETE' });
-    const result = await response.json();
-
-    if (result.success) {
-      if (state.isSearching) {
-        // 搜索模式：从本地数组移除并重新渲染
-        state.allFiles = state.allFiles.filter(f => f.name !== name);
-        renderPaginatedFiles(state.allFiles);
-      } else {
-        loadFiles(false);
-      }
-    } else {
-      alert('删除失败: ' + result.error);
-    }
-  } catch (error) {
-    alert('删除失败: ' + error.message);
   }
 }
 
@@ -599,6 +601,30 @@ document.querySelector('.modal-close').addEventListener('click', () => {
 elements.previewModal.addEventListener('click', (e) => {
   if (e.target === elements.previewModal.querySelector('.modal-overlay')) {
     elements.previewModal.classList.add('hidden');
+  }
+});
+
+// 文件操作按钮事件委托
+elements.fileListBody.addEventListener('click', (e) => {
+  const btn = e.target.closest('.icon-btn');
+  if (!btn) return;
+
+  const fileItem = btn.closest('.file-item');
+  if (!fileItem) return;
+
+  const fileName = fileItem.dataset.name;
+  const action = btn.dataset.action;
+
+  switch (action) {
+    case 'openFolder':
+      openFolder(fileName);
+      break;
+    case 'previewFile':
+      previewFile(fileName);
+      break;
+    case 'downloadFile':
+      downloadFile(fileName);
+      break;
   }
 });
 
