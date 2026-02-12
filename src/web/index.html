@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>阿里云 OSS 管理器</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="app">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h1>OSS 管理器</h1>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="nav-item active" data-view="files">
+          <span class="icon">📁</span>
+          <span>文件管理</span>
+        </div>
+        <div class="nav-item" data-view="upload">
+          <span class="icon">⬆️</span>
+          <span>上传文件</span>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+      <!-- 顶部工具栏 -->
+      <header class="toolbar">
+        <div class="breadcrumb">
+          <span class="breadcrumb-item">root</span>
+        </div>
+        <div class="toolbar-actions">
+          <input type="text" id="searchInput" placeholder="搜索文件..." class="search-input">
+          <button id="refreshBtn" class="btn btn-secondary">刷新</button>
+          <button id="uploadBtn" class="btn btn-primary">上传文件</button>
+        </div>
+      </header>
+
+      <!-- 文件列表视图 -->
+      <div id="filesView" class="view active">
+        <div class="file-list">
+          <div class="file-list-header">
+            <div class="col-name">名称</div>
+            <div class="col-size">大小</div>
+            <div class="col-date">修改时间</div>
+            <div class="col-actions">操作</div>
+          </div>
+          <div id="fileListBody" class="file-list-body">
+            <!-- 文件列表将通过 JS 动态生成 -->
+          </div>
+        </div>
+      </div>
+
+      <!-- 上传视图 -->
+      <div id="uploadView" class="view">
+        <div class="upload-area">
+          <div class="upload-zone" id="uploadZone">
+            <div class="upload-icon">📤</div>
+            <p>拖拽文件到此处或点击选择文件</p>
+            <input type="file" id="fileInput" multiple hidden>
+          </div>
+          <div id="uploadProgress" class="upload-progress hidden">
+            <div class="progress-item">
+              <span id="uploadFileName">文件名</span>
+              <div class="progress-bar">
+                <div id="uploadProgressBar" class="progress-fill"></div>
+              </div>
+              <span id="uploadPercent">0%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- 预览模态框 -->
+  <div id="previewModal" class="modal hidden">
+    <div class="modal-overlay"></div>
+    <div class="modal-content">
+      <button class="modal-close">&times;</button>
+      <div id="previewContent" class="preview-content"></div>
+    </div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
