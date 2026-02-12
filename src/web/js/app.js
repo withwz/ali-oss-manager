@@ -23,6 +23,15 @@ const state = {
     field: 'name',
     order: 'asc', // 'asc' or 'desc'
   },
+
+  // 画廊状态
+  gallery: {
+    images: [],
+    loadedCount: 0,
+    isLoading: false,
+    hasMore: true,
+    sortBy: 'name',
+  },
 };
 
 // DOM 元素
@@ -42,6 +51,13 @@ const elements = {
   prevPageBtn: document.getElementById('prevPageBtn'),
   nextPageBtn: document.getElementById('nextPageBtn'),
   lastPageBtn: document.getElementById('lastPageBtn'),
+  // 画廊元素
+  galleryMasonry: document.getElementById('galleryMasonry'),
+  galleryCount: document.getElementById('galleryCount'),
+  gallerySort: document.getElementById('gallerySort'),
+  refreshGalleryBtn: document.getElementById('refreshGalleryBtn'),
+  loadMoreGallery: document.getElementById('loadMoreGallery'),
+  loadMoreBtn: document.getElementById('loadMoreBtn'),
 };
 
 // 格式化文件大小
@@ -567,6 +583,194 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !elements.previewModal.classList.contains('hidden')) {
     elements.previewModal.classList.add('hidden');
   }
+});
+
+// ========== 画廊功能 ==========
+
+// 图片扩展名列表
+const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp', 'avif'];
+
+// 判断是否为图片
+function isImageFile(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  return IMAGE_EXTENSIONS.includes(ext);
+}
+
+// 加载画廊图片
+async function loadGallery(reset = true) {
+  if (state.gallery.isLoading) return;
+
+  state.gallery.isLoading = true;
+
+  try {
+    if (reset) {
+      state.gallery.images = [];
+      state.gallery.loadedCount = 0;
+      state.gallery.hasMore = true;
+      elements.galleryMasonry.innerHTML = '<div class="gallery-loading"><div class="spinner"></div><p>加载图片中...</p></div>';
+    }
+
+    const params = new URLSearchParams({
+      'max-keys': '100',
+    });
+
+    // 如果有更多图片，使用 continuation token
+    if (!reset && state.gallery.continuationToken) {
+      params.append('continuation-token', state.gallery.continuationToken);
+    }
+
+    const response = await fetch(`${API_BASE}/objects?${params}`);
+    const result = await response.json();
+
+    if (result.success) {
+      const items = result.data.items || [];
+      const images = items.filter(item => item.type === 'file' && isImageFile(item.name));
+
+      state.gallery.images = reset ? images : [...state.gallery.images, ...images];
+      state.gallery.continuationToken = result.data.isTruncated ? result.data.nextMarker : null;
+      state.gallery.hasMore = result.data.isTruncated;
+      state.gallery.loadedCount = state.gallery.images.length;
+
+      await renderGallery();
+    }
+  } catch (error) {
+    elements.galleryMasonry.innerHTML = `<div class="gallery-empty"><div class="gallery-empty-icon">⚠️</div><p>加载失败: ${error.message}</p></div>`;
+  } finally {
+    state.gallery.isLoading = false;
+  }
+}
+
+// 渲染画廊
+async function renderGallery() {
+  const images = sortGalleryImages(state.gallery.images);
+
+  if (images.length === 0) {
+    elements.galleryMasonry.innerHTML = `
+      <div class="gallery-empty">
+        <div class="gallery-empty-icon">🖼️</div>
+        <p>暂无图片</p>
+      </div>
+    `;
+    elements.galleryCount.textContent = '0 张图片';
+    elements.loadMoreGallery.classList.add('hidden');
+    return;
+  }
+
+  elements.galleryCount.textContent = `${images.length} 张图片`;
+
+  // 获取签名 URL
+  const imageUrls = await Promise.all(
+    images.map(async (img) => {
+      try {
+        const response = await fetch(`${API_BASE}/signed-url?key=${encodeURIComponent(img.name)}&expires=3600`);
+        const result = await response.json();
+        return result.success ? result.data.url : null;
+      } catch {
+        return null;
+      }
+    })
+  );
+
+  elements.galleryMasonry.innerHTML = images.map((img, index) => {
+    const url = imageUrls[index];
+    const hasImage = !!url;
+
+    return `
+    <div class="gallery-item ${!hasImage ? 'image-error' : ''}" data-name="${escapeHtml(img.name)}" style="animation-delay: ${Math.min(index * 0.05, 0.5)}s">
+      ${hasImage
+        ? `<img class="gallery-item-image" src="${url}" alt="${escapeHtml(img.name)}" loading="lazy">`
+        : `<div class="gallery-item-placeholder">🖼️</div>`
+      }
+      <div class="gallery-item-info">
+        <div class="gallery-item-name">${escapeHtml(img.name.split('/').pop())}</div>
+        <div class="gallery-item-meta">
+          <span>${formatSize(img.size)}</span>
+          <span>${formatDate(img.lastModified)}</span>
+        </div>
+      </div>
+      <div class="gallery-item-actions">
+        <button class="gallery-action-btn" data-action="preview" title="预览">👁️</button>
+        <button class="gallery-action-btn" data-action="download" title="下载">⬇️</button>
+      </div>
+    </div>
+  `;
+  }).join('');
+
+  // 显示/隐藏加载更多按钮
+  if (state.gallery.hasMore) {
+    elements.loadMoreGallery.classList.remove('hidden');
+  } else {
+    elements.loadMoreGallery.classList.add('hidden');
+  }
+}
+
+// 排序画廊图片
+function sortGalleryImages(images) {
+  const sortBy = state.gallery.sortBy;
+  return [...images].sort((a, b) => {
+    switch (sortBy) {
+      case 'name':
+        return a.name.localeCompare(b.name);
+      case 'date':
+        return new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime();
+      case 'size':
+        return b.size - a.size;
+      default:
+        return 0;
+    }
+  });
+}
+
+// 画廊排序
+elements.gallerySort?.addEventListener('change', async (e) => {
+  state.gallery.sortBy = e.target.value;
+  await renderGallery();
+});
+
+// 刷新画廊
+elements.refreshGalleryBtn?.addEventListener('click', () => loadGallery(true));
+
+// 加载更多
+elements.loadMoreBtn?.addEventListener('click', () => loadGallery(false));
+
+// 画廊点击事件
+elements.galleryMasonry?.addEventListener('click', (e) => {
+  const galleryItem = e.target.closest('.gallery-item');
+  if (!galleryItem) return;
+
+  const actionBtn = e.target.closest('.gallery-action-btn');
+  const fileName = galleryItem.dataset.name;
+
+  if (actionBtn) {
+    e.stopPropagation();
+    const action = actionBtn.dataset.action;
+    if (action === 'preview') {
+      previewFile(fileName);
+    } else if (action === 'download') {
+      downloadFile(fileName);
+    }
+  } else {
+    // 点击图片预览
+    previewFile(fileName);
+  }
+});
+
+// ========== 视图切换 ==========
+
+document.querySelectorAll('.nav-item').forEach((item) => {
+  item.addEventListener('click', () => {
+    document.querySelectorAll('.nav-item').forEach((i) => i.classList.remove('active'));
+    item.classList.add('active');
+
+    const view = item.dataset.view;
+    document.querySelectorAll('.view').forEach((v) => v.classList.remove('active'));
+    document.getElementById(view + 'View').classList.add('active');
+
+    // 切换到画廊视图时加载图片
+    if (view === 'gallery' && state.gallery.images.length === 0) {
+      loadGallery(true);
+    }
+  });
 });
 
 

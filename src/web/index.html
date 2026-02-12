@@ -18,6 +18,10 @@
           <span class="icon">📁</span>
           <span>文件管理</span>
         </div>
+        <div class="nav-item" data-view="gallery">
+          <span class="icon">🖼️</span>
+          <span>图片画廊</span>
+        </div>
       </nav>
     </aside>
 
@@ -85,6 +89,32 @@
           </div>
           <button id="nextPageBtn" class="page-btn" title="下一页">»</button>
           <button id="lastPageBtn" class="page-btn" title="末页">»»</button>
+        </div>
+      </div>
+
+      <!-- 图片画廊视图 -->
+      <div id="galleryView" class="view">
+        <div class="gallery-toolbar">
+          <div class="gallery-stats">
+            <span id="galleryCount">0 张图片</span>
+          </div>
+          <div class="gallery-controls">
+            <select id="gallerySort" class="sort-select">
+              <option value="name">按名称</option>
+              <option value="date">按日期</option>
+              <option value="size">按大小</option>
+            </select>
+            <button id="refreshGalleryBtn" class="btn btn-secondary">刷新</button>
+          </div>
+        </div>
+        <div id="galleryMasonry" class="gallery-masonry">
+          <div class="gallery-loading">
+            <div class="spinner"></div>
+            <p>加载图片中...</p>
+          </div>
+        </div>
+        <div id="loadMoreGallery" class="load-more-container hidden">
+          <button id="loadMoreBtn" class="btn btn-secondary">加载更多</button>
         </div>
       </div>
     </main>
