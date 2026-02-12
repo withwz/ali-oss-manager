@@ -150,4 +150,27 @@ export class OSSController {
       res.status(500).json(response);
     }
   };
+
+  /**
+   * 搜索文件
+   */
+  searchObjects = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const keyword = req.query.q as string;
+      if (!keyword) {
+        const response: ApiResponse = { success: false, error: '缺少搜索关键词' };
+        res.status(400).json(response);
+        return;
+      }
+      const results = await this.ossService.searchObjects(keyword);
+      const response: ApiResponse = { success: true, data: { items: results } };
+      res.json(response);
+    } catch (error) {
+      const response: ApiResponse = {
+        success: false,
+        error: (error as Error).message,
+      };
+      res.status(500).json(response);
+    }
+  };
 }

@@ -64,4 +64,11 @@ router.delete('/objects/:key', controller.deleteObject);
  */
 router.delete('/objects/batch', controller.deleteObjects);
 
+/**
+ * @route   GET /api/search
+ * @desc    搜索文件
+ * @query   q - 搜索关键词
+ */
+router.get('/search', controller.searchObjects);
+
 export default router;

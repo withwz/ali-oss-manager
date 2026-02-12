@@ -6,6 +6,7 @@ const state = {
   currentPrefix: '',
   files: [],
   isLoading: false,
+  isSearching: false,
 };
 
 // DOM 元素
@@ -14,6 +15,8 @@ const elements = {
   refreshBtn: document.getElementById('refreshBtn'),
   uploadBtn: document.getElementById('uploadBtn'),
   searchInput: document.getElementById('searchInput'),
+  searchBtn: document.getElementById('searchBtn'),
+  clearSearchBtn: document.getElementById('clearSearchBtn'),
   uploadZone: document.getElementById('uploadZone'),
   fileInput: document.getElementById('fileInput'),
   uploadProgress: document.getElementById('uploadProgress'),
@@ -45,23 +48,46 @@ function getFileIcon(name, isFolder) {
   const ext = name.split('.').pop().toLowerCase();
   const icons = {
     // 图片
-    jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', webp: '🖼️', svg: '🖼️',
+    jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️', webp: '🖼️', svg: '🖼️', ico: '🖼️', bmp: '🖼️',
     // 视频
-    mp4: '🎬', mov: '🎬', avi: '🎬', mkv: '🎬',
+    mp4: '🎬', mov: '🎬', avi: '🎬', mkv: '🎬', webm: '🎬', flv: '🎬',
+    // 音频
+    mp3: '🎵', wav: '🎵', flac: '🎵', aac: '🎵', m4a: '🎵',
     // 文档
-    pdf: '📄', doc: '📄', docx: '📄', xls: '📊', xlsx: '📊',
+    pdf: '📄', doc: '📝', docx: '📝', xls: '📊', xlsx: '📊', ppt: '📽️', pptx: '📽️',
+    txt: '📃', md: '📃', rtf: '📃',
     // 代码
-    js: '📜', ts: '📜', py: '📜', java: '📜', css: '📜',
+    js: '📜', ts: '📜', py: '📜', java: '📜', css: '📜', html: '🌐', json: '📋', xml: '📋',
     // 压缩包
-    zip: '📦', rar: '📦', tar: '📦', gz: '📦',
+    zip: '📦', rar: '📦', tar: '📦', gz: '📦', '7z': '📦',
   };
   return icons[ext] || '📄';
+}
+
+// 获取文件类型（用于预览判断）
+function getFileType(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  const types = {
+    // 图片
+    image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp'],
+    // 视频
+    video: ['mp4', 'webm', 'ogg'],
+    // 音频
+    audio: ['mp3', 'wav', 'flac'],
+    // PDF
+    pdf: ['pdf'],
+  };
+  for (const [type, exts] of Object.entries(types)) {
+    if (exts.includes(ext)) return type;
+  }
+  return 'other';
 }
 
 // 加载文件列表
 async function loadFiles() {
   if (state.isLoading) return;
   state.isLoading = true;
+  state.isSearching = false;
 
   try {
     elements.fileListBody.innerHTML = '<div class="loading">加载中...</div>';
@@ -83,18 +109,58 @@ async function loadFiles() {
   }
 }
 
-// 渲染文件列表
-function renderFiles(files = state.files) {
-  if (files.length === 0) {
-    elements.fileListBody.innerHTML = '<div class="empty">暂无文件</div>';
+// 搜索文件
+async function searchFiles(keyword) {
+  if (state.isLoading) return;
+  if (!keyword.trim()) {
+    loadFiles();
     return;
   }
 
-  elements.fileListBody.innerHTML = files.map((file) => `
+  state.isLoading = true;
+  state.isSearching = true;
+
+  try {
+    elements.fileListBody.innerHTML = '<div class="loading">搜索中...</div>';
+
+    const params = new URLSearchParams({ q: keyword });
+    const response = await fetch(`${API_BASE}/search?${params}`);
+    const result = await response.json();
+
+    if (result.success) {
+      state.files = result.data.items;
+      renderFiles(result.data.items, true);
+    } else {
+      elements.fileListBody.innerHTML = `<div class="empty">搜索失败: ${result.error}</div>`;
+    }
+  } catch (error) {
+    elements.fileListBody.innerHTML = `<div class="empty">搜索失败: ${error.message}</div>`;
+  } finally {
+    state.isLoading = false;
+  }
+}
+
+// 渲染文件列表
+function renderFiles(files = state.files, isSearchResult = false) {
+  if (files.length === 0) {
+    const emptyText = isSearchResult ? '未找到匹配的文件' : '暂无文件';
+    elements.fileListBody.innerHTML = `<div class="empty">${emptyText}</div>`;
+    return;
+  }
+
+  // 搜索结果时显示路径，普通列表只显示文件名
+  elements.fileListBody.innerHTML = files.map((file) => {
+    const displayName = isSearchResult ? file.name : file.name.replace(state.currentPrefix, '');
+    const displayPath = isSearchResult ? `<div class="file-path">${file.name}</div>` : '';
+
+    return `
     <div class="file-item" data-type="${file.type}" data-name="${file.name}">
       <div class="file-name">
         <span class="file-icon">${getFileIcon(file.name, file.type === 'folder')}</span>
-        <span class="file-name-text">${file.name}</span>
+        <div class="file-name-wrapper">
+          <span class="file-name-text">${displayName}</span>
+          ${displayPath}
+        </div>
       </div>
       <div>${formatSize(file.size)}</div>
       <div>${formatDate(file.lastModified)}</div>
@@ -104,10 +170,11 @@ function renderFiles(files = state.files) {
           : `<button class="icon-btn" onclick="previewFile('${file.name}')">预览</button>
              <button class="icon-btn" onclick="downloadFile('${file.name}')">下载</button>`
         }
-        <button class="icon-btn" onclick="deleteFile('${file.name}')" style="color: var(--danger)">删除</button>
+        <button class="icon-btn btn-delete" onclick="deleteFile('${file.name}')">删除</button>
       </div>
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // 打开文件夹
@@ -133,6 +200,8 @@ function updateBreadcrumb() {
 // 导航到文件夹
 function navigateToFolder(prefix) {
   state.currentPrefix = prefix;
+  state.isSearching = false;
+  elements.searchInput.value = '';
   updateBreadcrumb();
   loadFiles();
 }
@@ -140,19 +209,47 @@ function navigateToFolder(prefix) {
 // 预览文件
 async function previewFile(name) {
   try {
+    const fileType = getFileType(name);
     const response = await fetch(`${API_BASE}/signed-url?key=${encodeURIComponent(name)}&expires=3600`);
     const result = await response.json();
 
     if (result.success) {
-      const ext = name.split('.').pop().toLowerCase();
-      const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
+      const url = result.data.url;
+      let content = '';
 
-      if (imageExts.includes(ext)) {
-        elements.previewContent.innerHTML = `<img src="${result.data.url}" alt="${name}">`;
-        elements.previewModal.classList.remove('hidden');
-      } else {
-        window.open(result.data.url, '_blank');
+      switch (fileType) {
+        case 'image':
+          content = `<img src="${url}" alt="${name}" style="max-width:100%;max-height:80vh;">`;
+          break;
+        case 'video':
+          content = `<video controls autoplay style="max-width:100%;max-height:80vh;">
+            <source src="${url}">
+            您的浏览器不支持视频播放
+          </video>`;
+          break;
+        case 'audio':
+          content = `<audio controls autoplay style="width:100%;">
+            <source src="${url}">
+            您的浏览器不支持音频播放
+          </audio>`;
+          break;
+        case 'pdf':
+          content = `<iframe src="${url}" style="width:100%;height:80vh;border:none;"></iframe>`;
+          break;
+        default:
+          // 其他文件类型，提供下载链接
+          content = `
+            <div class="preview-fallback">
+              <div class="fallback-icon">📄</div>
+              <p>此文件类型不支持在线预览</p>
+              <p class="file-name">${name}</p>
+              <button class="btn btn-primary" onclick="downloadFile('${name}')">下载文件</button>
+            </div>
+          `;
       }
+
+      elements.previewContent.innerHTML = content;
+      elements.previewModal.classList.remove('hidden');
     }
   } catch (error) {
     alert('预览失败: ' + error.message);
@@ -169,7 +266,10 @@ async function downloadFile(name) {
       const link = document.createElement('a');
       link.href = result.data.url;
       link.download = name.split('/').pop();
+      link.target = '_blank';
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
     }
   } catch (error) {
     alert('下载失败: ' + error.message);
@@ -185,7 +285,12 @@ async function deleteFile(name) {
     const result = await response.json();
 
     if (result.success) {
-      loadFiles();
+      if (state.isSearching) {
+        // 如果在搜索结果中删除，重新搜索
+        searchFiles(elements.searchInput.value);
+      } else {
+        loadFiles();
+      }
     } else {
       alert('删除失败: ' + result.error);
     }
@@ -203,6 +308,7 @@ async function uploadFile(file) {
   elements.uploadFileName.textContent = file.name;
   elements.uploadProgress.classList.remove('hidden');
   elements.uploadProgressBar.style.width = '0%';
+  document.getElementById('uploadPercent').textContent = '0%';
 
   try {
     const xhr = new XMLHttpRequest();
@@ -227,6 +333,11 @@ async function uploadFile(file) {
       }
     });
 
+    xhr.addEventListener('error', () => {
+      alert('上传失败: 网络错误');
+      elements.uploadProgress.classList.add('hidden');
+    });
+
     xhr.open('POST', `${API_BASE}/upload`);
     xhr.send(formData);
   } catch (error) {
@@ -235,8 +346,30 @@ async function uploadFile(file) {
   }
 }
 
+// 防抖函数
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
 // 事件监听
 elements.refreshBtn.addEventListener('click', loadFiles);
+
+elements.searchInput.addEventListener('input', debounce((e) => {
+  const keyword = e.target.value;
+  if (keyword.trim()) {
+    searchFiles(keyword);
+  } else {
+    loadFiles();
+  }
+}, 500));
 
 elements.uploadZone.addEventListener('click', () => elements.fileInput.click());
 
@@ -265,20 +398,19 @@ elements.fileInput.addEventListener('change', (e) => {
   }
 });
 
-elements.searchInput.addEventListener('input', (e) => {
-  const query = e.target.value.toLowerCase();
-  const filtered = state.files.filter((file) =>
-    file.name.toLowerCase().includes(query)
-  );
-  renderFiles(filtered);
-});
-
 document.querySelector('.modal-close').addEventListener('click', () => {
   elements.previewModal.classList.add('hidden');
 });
 
 elements.previewModal.addEventListener('click', (e) => {
   if (e.target === elements.previewModal.querySelector('.modal-overlay')) {
+    elements.previewModal.classList.add('hidden');
+  }
+});
+
+// 键盘事件：ESC 关闭预览
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !elements.previewModal.classList.contains('hidden')) {
     elements.previewModal.classList.add('hidden');
   }
 });

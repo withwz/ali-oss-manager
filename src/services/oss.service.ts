@@ -173,4 +173,62 @@ export class OSSService {
       return false;
     }
   }
+
+  /**
+   * 搜索文件（递归搜索所有匹配前缀的文件）
+   */
+  async searchObjects(keyword: string, maxKeys = 1000): Promise<OSSObject[]> {
+    try {
+      const result = await this.client.list({
+        'max-keys': maxKeys,
+        prefix: '',
+      });
+
+      const items: OSSObject[] = [];
+
+      // 搜索文件夹（公共前缀）
+      if (result.prefixes) {
+        result.prefixes.forEach((prefix) => {
+          if (prefix.toLowerCase().includes(keyword.toLowerCase())) {
+            items.push({
+              name: prefix,
+              url: '',
+              size: 0,
+              lastModified: new Date(),
+              type: 'folder',
+            });
+          }
+        });
+      }
+
+      // 搜索文件
+      if (result.objects) {
+        result.objects.forEach((obj) => {
+          if (obj.name.toLowerCase().includes(keyword.toLowerCase())) {
+            items.push({
+              name: obj.name,
+              url: this.client.signatureUrl(obj.name, { expires: 3600 }),
+              size: obj.size,
+              lastModified: new Date(obj.lastModified),
+              type: 'file',
+              contentType: '',
+            });
+          }
+        });
+      }
+
+      return items;
+    } catch (error) {
+      throw new Error(`搜索文件失败: ${(error as Error).message}`);
+    }
+  }
+
+  /**
+   * 获取公开访问 URL（用于预览）
+   */
+  getPublicUrl(key: string): string {
+    // 如果 bucket 是公共读的，直接返回公共 URL
+    const protocol = this.client.options.secure ? 'https' : 'http';
+    return `${protocol}://${ossConfig.bucket}.${ossConfig.region}.aliyuncs.com/${key}`;
+  }
 }

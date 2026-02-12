@@ -150,6 +150,15 @@ body {
   color: white;
 }
 
+.btn-delete {
+  color: var(--danger);
+}
+
+.btn-delete:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 /* 视图 */
 .view {
   display: none;
@@ -321,11 +330,65 @@ body {
 
 .preview-content {
   padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
 }
 
 .preview-content img {
   max-width: 100%;
   max-height: 80vh;
+  object-fit: contain;
+}
+
+.preview-content video {
+  max-width: 100%;
+  max-height: 80vh;
+}
+
+.preview-content audio {
+  max-width: 500px;
+}
+
+.preview-content iframe {
+  border-radius: 4px;
+}
+
+/* 文件路径显示 */
+.file-name-wrapper {
+  flex: 1;
+  overflow: hidden;
+}
+
+.file-path {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 预览降级样式 */
+.preview-fallback {
+  text-align: center;
+  padding: 60px 40px;
+}
+
+.fallback-icon {
+  font-size: 64px;
+  margin-bottom: 20px;
+}
+
+.preview-fallback p {
+  margin: 10px 0;
+  color: var(--text-secondary);
+}
+
+.preview-fallback .file-name {
+  font-size: 14px;
+  color: var(--text);
 }
 
 /* 工具类 */
