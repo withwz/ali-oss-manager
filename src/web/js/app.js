@@ -522,25 +522,43 @@ elements.previewModal.addEventListener('click', (e) => {
 
 // 文件操作按钮事件委托
 elements.fileListBody.addEventListener('click', (e) => {
+  // 检查是否点击了按钮
   const btn = e.target.closest('.icon-btn');
-  if (!btn) return;
+  if (btn) {
+    const fileItem = btn.closest('.file-item');
+    if (!fileItem) return;
 
-  const fileItem = btn.closest('.file-item');
-  if (!fileItem) return;
+    const fileName = fileItem.dataset.name;
+    const action = btn.dataset.action;
 
-  const fileName = fileItem.dataset.name;
-  const action = btn.dataset.action;
+    switch (action) {
+      case 'openFolder':
+        openFolder(fileName);
+        break;
+      case 'previewFile':
+        previewFile(fileName);
+        break;
+      case 'downloadFile':
+        downloadFile(fileName);
+        break;
+    }
+    return;
+  }
 
-  switch (action) {
-    case 'openFolder':
+  // 检查是否点击了文件名
+  const fileNameWrapper = e.target.closest('.file-name-wrapper');
+  if (fileNameWrapper) {
+    const fileItem = fileNameWrapper.closest('.file-item');
+    if (!fileItem) return;
+
+    const fileName = fileItem.dataset.name;
+    const fileType = fileItem.dataset.type;
+
+    if (fileType === 'folder') {
       openFolder(fileName);
-      break;
-    case 'previewFile':
+    } else {
       previewFile(fileName);
-      break;
-    case 'downloadFile':
-      downloadFile(fileName);
-      break;
+    }
   }
 });
 
