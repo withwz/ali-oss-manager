@@ -677,20 +677,15 @@ async function renderGallery() {
   elements.galleryMasonry.innerHTML = images.map((img, index) => {
     const url = imageUrls[index];
     const hasImage = !!url;
-    // 更自然的动画延迟
-    const delay = Math.min(index * 0.03, 0.4);
 
     return `
-    <div class="gallery-item ${!hasImage ? 'image-error' : ''}" data-name="${escapeHtml(img.name)}" style="animation-delay: ${delay}s">
+    <div class="gallery-item ${!hasImage ? 'image-error' : ''}" data-name="${escapeHtml(img.name)}">
       ${hasImage
         ? `<img class="gallery-item-image" src="${url}" alt="${escapeHtml(img.name)}" loading="lazy">`
         : `<div class="gallery-item-placeholder">🖼️</div>`
       }
       <div class="gallery-item-info">
         <div class="gallery-item-name">${escapeHtml(img.name.split('/').pop())}</div>
-        <div class="gallery-item-meta">
-          <span>${formatSize(img.size)}</span>
-        </div>
       </div>
       <div class="gallery-item-actions">
         <button class="gallery-action-btn" data-action="preview" title="预览">👁️</button>
